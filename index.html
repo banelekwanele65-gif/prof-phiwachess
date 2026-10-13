@@ -1,0 +1,129 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prof. PHIWAchess</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:18px;background:#101827;color:#f8fafc;
+font-family:Arial,sans-serif;text-align:center}
+h1{color:#60d6b5;margin-bottom:5px}
+p{color:#bdc8d8}
+#board{display:grid;grid-template-columns:repeat(8,1fr);
+width:min(92vw,440px);margin:18px auto;border:4px solid #28384c}
+.square{aspect-ratio:1;display:flex;align-items:center;
+justify-content:center;font-size:clamp(25px,8vw,43px);cursor:pointer}
+.light{background:#e8dfc8}.dark{background:#6c987b}
+.selected{outline:4px solid #facc15;outline-offset:-4px}
+button{background:#60d6b5;color:#10221e;border:0;border-radius:9px;
+padding:12px 16px;margin:5px;font-weight:bold;font-size:15px}
+#status{min-height:28px;font-weight:bold;color:#60d6b5}
+.small{font-size:13px;color:#aebdd0}
+</style>
+</head>
+<body>
+<h1>♟ Prof. PHIWAchess</h1>
+<p>Your chess journey starts here.</p>
+<div id="status">Loading chess rules...</div>
+<div id="board"></div>
+<button onclick="newGame()">New Game</button>
+<button onclick="undoMove()">Undo</button>
+<button onclick="flipBoard()">Flip Board</button>
+<p class="small">Prototype 1.0 · Play as White against the computer</p>
+<p class="small">The computer uses a basic move-selection strategy for now.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script>
+const board=document.getElementById("board");
+const statusBox=document.getElementById("status");
+const symbols={
+w:{k:"♔",q:"♕",r:"♖",b:"♗",n:"♘",p:"♙"},
+b:{k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"}
+};
+let game,selected=null,flipped=false,thinking=false;
+const files="abcdefgh";
+function start(){
+ if(typeof Chess==="undefined"){
+  statusBox.textContent="Chess library didn't load. Check your internet connection.";
+  return;
+ }
+ game=new Chess();selected=null;thinking=false;draw();
+ statusBox.textContent="Your turn — White plays first.";
+}
+function draw(){
+ board.innerHTML="";
+ for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+  let rr=flipped?7-r:r,cc=flipped?7-c:c;
+  let sq=files[cc]+(8-rr);
+  let piece=game.get(sq);
+  let el=document.createElement("div");
+  el.className="square "+((rr+cc)%2?"dark":"light");
+  if(sq===selected)el.classList.add("selected");
+  el.textContent=piece?symbols[piece.color][piece.type]:"";
+  el.onclick=()=>tapSquare(sq);
+  board.appendChild(el);
+ }
+}
+function tapSquare(sq){
+ if(thinking||game.game_over()||game.turn()!=="w")return;
+ let piece=game.get(sq);
+ if(selected){
+  let result=game.move({from:selected,to:sq,promotion:"q"});
+  if(result){
+   selected=null;draw();
+   if(finishCheck())return;
+   statusBox.textContent="Computer is thinking...";
+   thinking=true;
+   setTimeout(computerMove,350);
+   return;
+  }
+ }
+ if(piece&&piece.color==="w")selected=sq;
+ else selected=null;
+ draw();
+}
+function computerMove(){
+ if(game.game_over()){thinking=false;finishCheck();return}
+ let moves=game.moves({verbose:true});
+ if(!moves.length){thinking=false;finishCheck();return}
+ let best=[],bestScore=-999;
+ for(const m of moves){
+  let score=Math.random()*0.5;
+  if(m.captured)score+=({p:1,n:3,b:3,r:5,q:9}[m.captured]||1);
+  if(m.promotion)score+=8;
+  game.move(m);
+  if(game.in_checkmate())score+=1000;
+  else if(game.in_check())score+=1.5;
+  game.undo();
+  if(score>bestScore){bestScore=score;best=[m]}
+  else if(score===bestScore)best.push(m);
+ }
+ game.move(best[Math.floor(Math.random()*best.length)]);
+ thinking=false;draw();finishCheck();
+}
+function finishCheck(){
+ if(game.in_checkmate()){
+  statusBox.textContent=game.turn()==="w"?"Checkmate — computer wins!":"Checkmate — you win!";
+  return true;
+ }
+ if(game.in_draw()){
+  statusBox.textContent="Draw game.";
+  return true;
+ }
+ statusBox.textContent=game.in_check()?"Check!":"Your turn — White plays.";
+ return false;
+}
+function newGame(){if(typeof Chess!=="undefined")start()}
+function undoMove(){
+ if(!game||thinking)return;
+ game.undo();
+ if(game.turn()==="b")game.undo();
+ selected=null;draw();finishCheck();
+}
+function flipBoard(){flipped=!flipped;draw()}
+start();
+</script>
+</body>
+</html>
